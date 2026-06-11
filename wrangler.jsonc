@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "salv-pundit-cup",
+  "name": "public-pundit-cup",
   "main": "_worker.js",
   "compatibility_date": "2026-06-11",
   "assets": {
