@@ -374,7 +374,7 @@ function formView(){
 
 /* ===== TABLE / RESULTS ===== */
 function tableView(){const rows=Store.leaderboard(Store.name(),myTotal());const m=['🥇','🥈','🥉'];
- let h='<div class="pad"><div class="section-intro">Standings move as results land. Sample rivals shown for the demo.</div><div class="lbcard">';
+ let h='<div class="pad"><div class="section-intro">'+(LIVE?'Standings update as results land.':'Standings move as results land. Sample rivals shown for the demo.')+'</div><div class="lbcard">';
  rows.forEach((r,i)=>{h+=`<div class="lbrow ${r.me?'me':''}"><div class="rk">${i<3?m[i]:i+1}</div><div class="lbname">${r.name||'You'}${r.me?'<span class="tagme">you</span>':''}</div><div class="lbpts">${r.pts}<span> pts</span></div></div>`;});
  h+='</div></div>';return h;}
 function resultsView(){const r=Store.results(),p=Store.preds();const played=FIXTURES.filter(f=>r[f.n]);
@@ -419,7 +419,7 @@ function confetti(){const cv=document.getElementById('cf'),cx=cv.getContext('2d'
 /* gate */
 function enter(n){Store.setName(n);
  if(LIVE&&SERVER.players){const sp=SERVER.players.find(p=>p.name===n);
-   if(sp&&!Object.keys(Store.preds()).length&&sp.preds&&Object.keys(sp.preds).length)LS.set('swc_preds',sp.preds);}
+   if(sp&&sp.preds&&Object.keys(sp.preds).length)LS.set('swc_preds',sp.preds);}
  document.getElementById('gate').classList.add('hidden');
  idx=firstUnpredicted();prevLvl=levelInfo().lvl;render();}
 document.getElementById('startBtn').addEventListener('click',()=>{const n=document.getElementById('nm').value.trim();if(!n){document.getElementById('nm').focus();return;}enter(n);});
