@@ -27,6 +27,12 @@ header img{height:24px;display:block}
 .ring{position:relative;width:42px;height:42px}.ring svg{transform:rotate(-90deg)}
 .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
 main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#ptr{position:absolute;top:54px;left:50%;transform:translateX(-50%) scale(.6);z-index:15;width:34px;height:34px;border-radius:50%;
+ background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;color:var(--pitch);
+ font-size:19px;font-weight:900;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s}
+#ptr.show{opacity:1}
+#ptr.loading>div{animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
 /* ===== PLAY ARENA ===== */
 .arena{padding:10px 12px 14px;display:flex;flex-direction:column;flex:1}
 .matchmeta{display:flex;align-items:center;justify-content:space-between;margin:2px 2px 8px}
@@ -114,6 +120,7 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-web
 .rk{width:28px;font-weight:900;color:var(--slate);font-size:15px;text-align:center}
 .lbname{flex:1;font-weight:700}.tagme{font-size:10px;background:var(--pear);color:#143006;padding:2px 7px;border-radius:20px;margin-left:6px;font-weight:800}
 .lbpts{font-weight:900;color:var(--pitch);font-size:16px}.lbpts span{font-size:11px;color:var(--muted)}
+.lbrow{cursor:pointer}.lbrow .chev{color:#c2c4cc;font-weight:900;font-size:18px;margin-left:2px}.lbrow:active{background:#eef0f3}
 .rfrow{display:flex;align-items:center;gap:10px;background:#fff;border-radius:14px;padding:11px 13px;margin:8px 0;box-shadow:0 2px 8px rgba(40,40,60,.05)}
 .rfteams{flex:1;font-weight:700;font-size:13px}.rfteams small{color:var(--muted)}
 .rfscore{font-weight:900;color:var(--slate);font-size:15px;background:#eef0f3;padding:4px 9px;border-radius:8px}
@@ -160,6 +167,7 @@ canvas#cf{position:fixed;inset:0;pointer-events:none;z-index:55}
    </div>
   </div>
  </header>
+ <div id="ptr"><div>↻</div></div>
  <main id="view"></main>
  <nav>
   <button data-tab="play" class="on"><span class="ic">⚽</span>Play</button>
@@ -235,7 +243,7 @@ function sfx(kind){if(muted)return;const c=ac();if(!c)return;try{
 }catch(e){}}
 
 /* ui state */
-let TAB='play',mode='play',idx=0,playTeam='h',cur={h:0,a:0},shooting=false,prevLvl=1;
+let TAB='play',mode='play',idx=0,playTeam='h',cur={h:0,a:0},shooting=false,prevLvl=1,viewName=null;
 const view=document.getElementById('view'),RC=2*Math.PI*17;
 
 function updateHeader(){const li=levelInfo();const st=streak();const nm=Store.name()||'';
@@ -374,9 +382,27 @@ function formView(){
 
 /* ===== TABLE / RESULTS ===== */
 function tableView(){const rows=Store.leaderboard(Store.name(),myTotal());const m=['🥇','🥈','🥉'];
- let h='<div class="pad"><div class="section-intro">'+(LIVE?'Standings update as results land.':'Standings move as results land. Sample rivals shown for the demo.')+'</div><div class="lbcard">';
- rows.forEach((r,i)=>{h+=`<div class="lbrow ${r.me?'me':''}"><div class="rk">${i<3?m[i]:i+1}</div><div class="lbname">${r.name||'You'}${r.me?'<span class="tagme">you</span>':''}</div><div class="lbpts">${r.pts}<span> pts</span></div></div>`;});
+ let h='<div class="pad"><div class="section-intro">'+(LIVE?'Tap a player to see their predictions.':'Standings move as results land. Sample rivals shown for the demo.')+'</div><div class="lbcard">';
+ rows.forEach((r,i)=>{h+=`<div class="lbrow ${r.me?'me':''}" data-player="${r.name||''}"><div class="rk">${i<3?m[i]:i+1}</div><div class="lbname">${r.name||'You'}${r.me?'<span class="tagme">you</span>':''}</div><div class="lbpts">${r.pts}<span> pts</span></div><span class="chev">›</span></div>`;});
  h+='</div></div>';return h;}
+function playerView(name){
+ const isMe=name===Store.name();
+ const pl=(SERVER.players||[]).find(p=>p.name===name);
+ const preds=isMe?Store.preds():(pl?pl.preds:{});const res=Store.results();
+ let total=0;for(const f of FIXTURES){const s=scoreFor(preds[f.n],res[f.n]);if(s)total+=s;}
+ let h=`<div class="pad"><div class="backbar"><button class="btn ghost sm" data-act="backtable">◀ Table</button><span class="mc" style="font-weight:800;color:var(--slate)">${name} · ${total} pts</span></div>`;
+ let cd=null;
+ for(const f of FIXTURES){
+  const day=fmtDay(f.ko);if(day!==cd){cd=day;h+=`<div class="grouphdr"><span class="gp">📅</span>${day}</div>`;}
+  const locked=isLocked(f),res1=res[f.n],pr=preds[f.n],reveal=isMe||locked;
+  let pick,badge='';
+  if(reveal&&pr&&pr.h!=null){pick=`${pr.h}–${pr.a}`;if(res1){const s=scoreFor(pr,res1);badge=s===3?'<span class="mpts hit">+3</span>':s===1?'<span class="mpts par">+1</span>':'<span class="mpts miss">0</span>';}}
+  else if(reveal){pick='<span style="color:var(--muted)">no pick</span>';}
+  else{pick='<span style="color:var(--muted)">🔒 hidden until kickoff</span>';}
+  const right=res1?`${res1.h}–${res1.a}`:`<span class="kobadge">${fmtKOshort(f.ko)}</span>`;
+  h+=`<div class="rfrow"><div class="rfteams">${f.hf} ${f.home} <small>v</small> ${f.away} ${f.af}<br><small>pick: ${pick}</small></div><div class="rfscore">${right}</div>${badge}</div>`;
+ }
+ h+='</div>';return h;}
 function resultsView(){const r=Store.results(),p=Store.preds();const played=FIXTURES.filter(f=>r[f.n]);
  if(!played.length)return '<div class="empty-state"><div class="b">⚽</div><p>No final scores yet. Once matches finish, your hits light up here.</p></div>';
  let h='<div class="pad"><div class="section-intro">How your calls are landing.</div>';
@@ -389,7 +415,12 @@ function resultsView(){const r=Store.results(),p=Store.preds();const played=FIXT
 function render(){
  if(TAB==='play'){view.innerHTML=mode==='form'?formView():playView();if(mode==='play')wirePlay();
    else document.querySelectorAll('[data-act="backplay"]').forEach(b=>b.addEventListener('click',()=>act('backplay')));}
- else if(TAB==='table')view.innerHTML=tableView();
+ else if(TAB==='table'){
+   if(viewName){view.innerHTML=playerView(viewName);
+     document.querySelectorAll('[data-act="backtable"]').forEach(b=>b.addEventListener('click',()=>{viewName=null;render();}));}
+   else{view.innerHTML=tableView();
+     document.querySelectorAll('.lbrow').forEach(el=>el.addEventListener('click',()=>{const nm=el.dataset.player;if(nm){viewName=nm;render();}}));}
+ }
  else view.innerHTML=resultsView();
  updateHeader();window.scrollTo(0,0);
 }
@@ -402,7 +433,7 @@ view.addEventListener('click',e=>{const b=e.target.closest('.sbtn');if(!b)return
  c[side]=v;p[n]=c;Store.savePreds(p);const sv=m.querySelector(`.sval[data-val="${side}"]`);sv.textContent=v;sv.classList.remove('empty');updateHeader();});
 
 document.querySelectorAll('nav button').forEach(btn=>btn.addEventListener('click',()=>{
- TAB=btn.dataset.tab;if(TAB==='play')mode='play';setNav();render();}));
+ TAB=btn.dataset.tab;if(TAB==='play')mode='play';viewName=null;setNav();render();}));
 document.getElementById('mute').addEventListener('click',()=>{muted=!muted;LS.set('swc_mute',muted);
  document.getElementById('mute').textContent=muted?'🔇':'🔊';if(!muted)sfx('kick');});
 
@@ -425,6 +456,27 @@ function enter(n){Store.setName(n);
 document.getElementById('startBtn').addEventListener('click',()=>{const n=document.getElementById('nm').value.trim();if(!n){document.getElementById('nm').focus();return;}enter(n);});
 document.getElementById('nm').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('startBtn').click();});
 document.getElementById('mute').textContent=muted?'🔇':'🔊';
+async function refreshData(){
+ try{const r=await fetch('/api/state',{cache:'no-store'});
+   if(r.ok){const d=await r.json();SERVER.results=d.results||{};SERVER.players=d.players||[];LIVE=true;
+     const nm=Store.name();if(nm&&SERVER.players){const sp=SERVER.players.find(p=>p.name===nm);if(sp&&sp.preds&&Object.keys(sp.preds).length)LS.set('swc_preds',sp.preds);}}}catch(e){}
+ render();
+}
+/* pull-to-refresh on the scroll area */
+(function(){const PTR=document.getElementById('ptr'),SCR=document.getElementById('view');if(!PTR||!SCR)return;
+ let pStart=null,pDist=0,pActive=false,busy=false;
+ SCR.addEventListener('touchstart',e=>{if(busy||e.target.closest('.pitch')){pStart=null;return;}pStart=SCR.scrollTop<=0?e.touches[0].clientY:null;pActive=false;pDist=0;},{passive:true});
+ SCR.addEventListener('touchmove',e=>{if(pStart==null)return;const dy=e.touches[0].clientY-pStart;
+   if(dy>0&&SCR.scrollTop<=0){pActive=true;pDist=Math.min(110,dy);const t=Math.min(1,pDist/70);
+     PTR.classList.add('show');PTR.style.transform='translateX(-50%) translateY('+(pDist*0.45)+'px) scale('+(0.6+0.4*t)+') rotate('+(pDist*2.2)+'deg)';
+     if(pDist>6)e.preventDefault();}},{passive:false});
+ SCR.addEventListener('touchend',async()=>{if(pActive&&pDist>=70&&!busy){busy=true;
+     PTR.classList.add('show','loading');PTR.style.transform='translateX(-50%) translateY(22px) scale(1)';
+     await refreshData();toast('Refreshed');
+     setTimeout(()=>{PTR.classList.remove('show','loading');PTR.style.transform='translateX(-50%) scale(.6)';busy=false;},300);
+   }else{PTR.classList.remove('show');PTR.style.transform='translateX(-50%) scale(.6)';}
+   pStart=null;pActive=false;pDist=0;});
+})();
 async function init(){
  try{const r=await fetch('/api/state',{cache:'no-store'});
    if(r.ok){const d=await r.json();SERVER.results=d.results||{};SERVER.players=d.players||[];LIVE=true;}}catch(e){}
