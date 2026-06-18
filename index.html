@@ -254,6 +254,7 @@ function updateHeader(){const li=levelInfo();const st=streak();const nm=Store.na
  if(li.lvl>prevLvl){levelUp(li.title);}prevLvl=li.lvl;}
 
 function firstUnpredicted(){const p=Store.preds();for(let i=0;i<FIXTURES.length;i++){const x=p[FIXTURES[i].n];if(!(x&&x.h!=null&&x.a!=null))return i;}return 0;}
+function firstUpcoming(){for(let i=0;i<FIXTURES.length;i++){if(!isLocked(FIXTURES[i]))return i;}return FIXTURES.length-1;}
 
 /* ===== PLAY ===== */
 function playView(){
@@ -359,17 +360,18 @@ function act(a){const f=FIXTURES[idx];
 function formView(){
  const p=Store.preds(),r=Store.results();
  let h='<div class="fwrap"><div class="backbar"><button class="btn ghost sm" data-act="backplay">◀ Back to play</button><span class="mc" style="font-weight:800;color:var(--slate)">Quick form</span></div>';
- let cd=null;
+ let cd=null;const curN=FIXTURES[firstUpcoming()].n;
  for(const f of FIXTURES){
   const day=fmtDay(f.ko);
   if(day!==cd){cd=day;h+=`<div class="grouphdr"><span class="gp">📅</span>${day}</div>`;}
   const pr=p[f.n]||{h:null,a:null},res=r[f.n],locked=isLocked(f);const md=f.round==='MD2'?'md2':f.round==='MD3'?'md3':'';
+  const anchor=f.n===curN?' id="curmatch"':'';
   let status;
   if(res){const s=scoreFor(pr,res);status=s===3?'<span class="mpts hit">+3</span>':s===1?'<span class="mpts par">+1</span>':(pr.h!=null?'<span class="mpts miss">0</span>':'<span class="mpts res">FT</span>');}
   else if(locked)status='<span class="mpts res">🔒 live</span>';
   else status=`<span class="kobadge">${fmtKOshort(f.ko)}</span>`;
   const dis=locked?'disabled':'';
-  h+=`<div class="match" data-n="${f.n}"><div class="mtop"><span class="mtag ${md}">${f.group} · ${f.round}</span>${status}</div>
+  h+=`<div class="match"${anchor} data-n="${f.n}"><div class="mtop"><span class="mtag ${md}">${f.group} · ${f.round}</span>${status}</div>
    <div class="fmteams"><span class="fl">${f.hf}</span> ${f.home} <i>v</i> ${f.away} <span class="fl">${f.af}</span></div>
    <div class="fmsteps">
      <div class="step"><button class="sbtn" data-act="dec" data-side="h" ${dis}>–</button><span class="sval ${pr.h==null?'empty':''}" data-val="h">${pr.h==null?'–':pr.h}</span><button class="sbtn" data-act="inc" data-side="h" ${dis}>+</button></div>
@@ -413,8 +415,11 @@ function resultsView(){const r=Store.results(),p=Store.preds();const played=FIXT
  h+='</div>';return h;}
 
 function render(){
- if(TAB==='play'){view.innerHTML=mode==='form'?formView():playView();if(mode==='play')wirePlay();
-   else document.querySelectorAll('[data-act="backplay"]').forEach(b=>b.addEventListener('click',()=>act('backplay')));}
+ if(TAB==='play'){
+   if(mode==='form'){view.innerHTML=formView();
+     document.querySelectorAll('[data-act="backplay"]').forEach(b=>b.addEventListener('click',()=>act('backplay')));
+     const el=document.getElementById('curmatch');if(el){el.scrollIntoView();const sc=document.getElementById('view');if(sc)sc.scrollTop=Math.max(0,sc.scrollTop-46);}}
+   else{view.innerHTML=playView();wirePlay();}}
  else if(TAB==='table'){
    if(viewName){view.innerHTML=playerView(viewName);
      document.querySelectorAll('[data-act="backtable"]').forEach(b=>b.addEventListener('click',()=>{viewName=null;render();}));}
@@ -452,7 +457,7 @@ function enter(n){Store.setName(n);
  if(LIVE&&SERVER.players){const sp=SERVER.players.find(p=>p.name===n);
    if(sp&&sp.preds&&Object.keys(sp.preds).length)LS.set('swc_preds',sp.preds);}
  document.getElementById('gate').classList.add('hidden');
- idx=firstUnpredicted();prevLvl=levelInfo().lvl;render();}
+ idx=firstUpcoming();prevLvl=levelInfo().lvl;render();}
 document.getElementById('startBtn').addEventListener('click',()=>{const n=document.getElementById('nm').value.trim();if(!n){document.getElementById('nm').focus();return;}enter(n);});
 document.getElementById('nm').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('startBtn').click();});
 document.getElementById('mute').textContent=muted?'🔇':'🔊';
