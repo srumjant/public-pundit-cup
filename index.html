@@ -106,6 +106,13 @@ main{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;-web
 .fmsteps .vs{font-size:18px;font-weight:900;color:var(--muted)}
 .koline{text-align:center;font-size:12px;color:var(--muted);font-weight:700;margin:0 0 6px}
 .kobadge{font-size:11px;font-weight:800;color:var(--capri);background:#eef5ff;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.pens{margin-top:10px;background:#fff;border:1px dashed #cdd0d8;border-radius:14px;padding:10px}
+.penlbl{font-size:12px;font-weight:800;color:var(--slate);text-align:center;margin-bottom:7px}
+.penlbl span{font-weight:600;color:var(--muted);font-size:11px}
+.penrow{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+.penrow .pteam{font-size:12px;font-weight:800;color:var(--slate);min-width:46px;text-align:center}
+.penform{margin-top:8px;justify-content:center}
+.penlbl2{font-size:11px;font-weight:800;color:var(--muted);align-self:center;margin-right:6px}
 .step{display:flex;align-items:center;gap:7px;flex:none}
 .sbtn{width:40px;height:40px;border-radius:10px;border:none;background:#eef0f3;color:var(--slate);font-size:22px;font-weight:800;cursor:pointer}
 .sval{width:36px;text-align:center;font-size:22px;font-weight:900;color:var(--slate)}.sval.empty{color:#c7c9d2}
@@ -220,7 +227,10 @@ const Store={
    r.push({name:nm,pts:pts,me:true});r.sort((a,b)=>b.pts-a.pts||(a.me?-1:1));return r;}
 };
 function scoreFor(p,res){if(!res||!p||p.h==null||p.a==null)return null;
- if(p.h===res.h&&p.a===res.a)return 3;return Math.sign(p.h-p.a)===Math.sign(res.h-res.a)?1:0;}
+ let pts=(p.h===res.h&&p.a===res.a)?3:(Math.sign(p.h-p.a)===Math.sign(res.h-res.a)?1:0);
+ if(res.pw&&p.h===p.a&&p.ph!=null&&p.pa!=null&&p.ph!==p.pa&&(p.ph>p.pa?'h':'a')===res.pw)pts+=1;
+ return pts;}
+function penStr(o){return (o&&o.ph!=null&&o.pa!=null&&o.h===o.a)?` (${o.ph}–${o.pa})`:'';}
 function myTotal(){const p=Store.preds(),r=Store.results();let t=0;for(const f of FIXTURES){const s=scoreFor(p[f.n],r[f.n]);if(s)t+=s;}return t;}
 function predictedCount(){const p=Store.preds();let c=0;for(const f of FIXTURES){const x=p[f.n];if(x&&x.h!=null&&x.a!=null)c++;}return c;}
 function streak(){const p=Store.preds(),r=Store.results();let s=0;
@@ -258,8 +268,8 @@ function firstUpcoming(){for(let i=0;i<FIXTURES.length;i++){if(!isLocked(FIXTURE
 
 /* ===== PLAY ===== */
 function playView(){
- const f=FIXTURES[idx];const p=Store.preds()[f.n];const predicted=!!(p&&p.h!=null);
- cur=predicted?{h:p.h,a:p.a}:{h:0,a:0};
+ const f=FIXTURES[idx];const p=Store.preds()[f.n];const predicted=!!(p&&p.h!=null);const isKO=!f.group;
+ cur=predicted?{h:p.h,a:p.a,ph:p.ph!=null?p.ph:0,pa:p.pa!=null?p.pa:0}:{h:0,a:0,ph:0,pa:0};
  const res=Store.results()[f.n];const locked=isLocked(f);
  const sc=(res&&predicted)?scoreFor(cur,res):null;
  const dh=(locked&&!predicted)?'–':cur.h,da=(locked&&!predicted)?'–':cur.a;
@@ -281,15 +291,21 @@ function playView(){
  const lockp=`<div class="lockpanel">
    <div class="lockicon">🔒</div>
    <div class="locktitle">Kicked off — your pick is locked</div>
-   ${res?`<div class="ftline">FT&nbsp; ${f.hf} ${f.home} ${res.h}–${res.a} ${f.away} ${f.af}</div>`:`<div class="ftline" style="color:var(--muted)">Result coming soon…</div>`}
-   ${predicted?`<div class="yourpick">Your pick ${cur.h}–${cur.a}${res?` · <b>${sc===3?'+3 spot on':sc===1?'+1 right result':'0 pts'}</b>`:''}</div>`:`<div class="yourpick">You didn't predict this one.</div>`}
+   ${res?`<div class="ftline">FT&nbsp; ${f.hf} ${f.home} ${res.h}–${res.a}${penStr(res)} ${f.away} ${f.af}</div>`:`<div class="ftline" style="color:var(--muted)">Result coming soon…</div>`}
+   ${predicted?`<div class="yourpick">Your pick ${cur.h}–${cur.a}${penStr(cur)}${res?` · <b>${sc>0?('+'+sc+' pts'):'0 pts'}</b>`:''}</div>`:`<div class="yourpick">You didn't predict this one.</div>`}
   </div>`;
  const ctrl=locked
    ?`<button class="btn" data-act="next">${idx<FIXTURES.length-1?'Next ▶':'Done ▶'}</button>`
    :`<button class="btn" data-act="lock">${predicted?'Update & next ▶':'Lock it in ▶'}</button>`;
  const badge=locked?'<span class="donepred lock">🔒 locked</span>':(predicted?'<span class="donepred">predicted ✓</span>':'<span></span>');
  const koHtml=`<div class="koline">⏱ Kicks off ${fmtKO(f.ko)}</div>`;
- return arena+(locked?lockp:koHtml+pitch)+`
+ const penPanel=isKO?`<div class="pens"><div class="penlbl">🥅 Shootout score <span>counts only if you call a draw</span></div>
+   <div class="penrow"><span class="pteam">${f.hf} ${f.ha}</span>
+     <button class="sbtn" data-act="pdec" data-side="ph">–</button><span class="sval" id="pph">${cur.ph}</span><button class="sbtn" data-act="pinc" data-side="ph">+</button>
+     <span class="vs">:</span>
+     <button class="sbtn" data-act="pdec" data-side="pa">–</button><span class="sval" id="ppa">${cur.pa}</span><button class="sbtn" data-act="pinc" data-side="pa">+</button>
+     <span class="pteam">${f.aa} ${f.af}</span></div></div>`:'';
+ return arena+(locked?lockp:koHtml+pitch+penPanel)+`
   <div class="playctrl">${ctrl}</div>
   <div class="subrow">
    <button class="linkbtn" data-act="prev" ${idx===0?'disabled':''}>◀ Prev</button>
@@ -307,6 +323,9 @@ function wirePlay(){
  if(ball)ball.addEventListener('pointerdown',startDrag);
  document.querySelectorAll('.minus').forEach(b=>b.addEventListener('click',()=>{
    const t=b.dataset.t;if(cur[t]>0){cur[t]--;document.getElementById(t==='h'?'sbh':'sba').textContent=cur[t];}}));
+ document.querySelectorAll('[data-act="pinc"],[data-act="pdec"]').forEach(b=>b.addEventListener('click',()=>{
+   const s=b.dataset.side,inc=b.dataset.act==='pinc';cur[s]=Math.max(0,Math.min(9,(cur[s]||0)+(inc?1:-1)));
+   document.getElementById(s==='ph'?'pph':'ppa').textContent=cur[s];}));
  document.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',()=>act(b.dataset.act)));
 }
 function goalAt(cx,cy){const gh=document.getElementById('goalH').getBoundingClientRect();
@@ -346,7 +365,7 @@ function scoreGoal(t){shooting=true;
  pitch.appendChild(po);setTimeout(()=>po.remove(),800);
  setTimeout(()=>{resetBall();shooting=false;},430);}
 function act(a){const f=FIXTURES[idx];
- if(a==='lock'){const p=Store.preds();p[f.n]={h:cur.h,a:cur.a};Store.savePreds(p);
+ if(a==='lock'){const p=Store.preds();p[f.n]=f.group?{h:cur.h,a:cur.a}:{h:cur.h,a:cur.a,ph:cur.ph,pa:cur.pa};Store.savePreds(p);
    confetti();sfx('cheer');updateHeader();
    if(idx<FIXTURES.length-1){idx++;render();}else{toast('All 72 locked in! 🏆');TAB='table';setNav();render();}}
  else if(a==='next'){if(idx<FIXTURES.length-1){idx++;render();}else{TAB='table';setNav();render();}}
@@ -364,7 +383,7 @@ function formView(){
  for(const f of FIXTURES){
   const day=fmtDay(f.ko);
   if(day!==cd){cd=day;h+=`<div class="grouphdr"><span class="gp">📅</span>${day}</div>`;}
-  const pr=p[f.n]||{h:null,a:null},res=r[f.n],locked=isLocked(f);const md=f.round==='MD2'?'md2':f.round==='MD3'?'md3':'';
+  const pr=p[f.n]||{h:null,a:null},res=r[f.n],locked=isLocked(f),isKO=!f.group;const md=f.round==='MD2'?'md2':f.round==='MD3'?'md3':'';
   const anchor=f.n===curN?' id="curmatch"':'';
   let status;
   if(res){const s=scoreFor(pr,res);status=s===3?'<span class="mpts hit">+3</span>':s===1?'<span class="mpts par">+1</span>':(pr.h!=null?'<span class="mpts miss">0</span>':'<span class="mpts res">FT</span>');}
@@ -378,7 +397,12 @@ function formView(){
      <span class="vs">:</span>
      <div class="step"><button class="sbtn" data-act="dec" data-side="a" ${dis}>–</button><span class="sval ${pr.a==null?'empty':''}" data-val="a">${pr.a==null?'–':pr.a}</span><button class="sbtn" data-act="inc" data-side="a" ${dis}>+</button></div>
    </div>
-   ${res?`<div class="actual">FT ${f.home} ${res.h}–${res.a} ${f.away}</div>`:''}</div>`;}
+   ${isKO?`<div class="fmsteps penform"><span class="penlbl2">Shootout</span>
+     <div class="step"><button class="sbtn" data-act="dec" data-side="ph" ${dis}>–</button><span class="sval ${pr.ph==null?'empty':''}" data-val="ph">${pr.ph==null?'0':pr.ph}</span><button class="sbtn" data-act="inc" data-side="ph" ${dis}>+</button></div>
+     <span class="vs">:</span>
+     <div class="step"><button class="sbtn" data-act="dec" data-side="pa" ${dis}>–</button><span class="sval ${pr.pa==null?'empty':''}" data-val="pa">${pr.pa==null?'0':pr.pa}</span><button class="sbtn" data-act="inc" data-side="pa" ${dis}>+</button></div>
+   </div>`:''}
+   ${res?`<div class="actual">FT ${f.home} ${res.h}–${res.a}${penStr(res)} ${f.away}</div>`:''}</div>`;}
  h+='</div>';return h;
 }
 
@@ -398,10 +422,10 @@ function playerView(name){
   const day=fmtDay(f.ko);if(day!==cd){cd=day;h+=`<div class="grouphdr"><span class="gp">📅</span>${day}</div>`;}
   const locked=isLocked(f),res1=res[f.n],pr=preds[f.n],reveal=isMe||locked;
   let pick,badge='';
-  if(reveal&&pr&&pr.h!=null){pick=`${pr.h}–${pr.a}`;if(res1){const s=scoreFor(pr,res1);badge=s===3?'<span class="mpts hit">+3</span>':s===1?'<span class="mpts par">+1</span>':'<span class="mpts miss">0</span>';}}
+  if(reveal&&pr&&pr.h!=null){pick=`${pr.h}–${pr.a}${penStr(pr)}`;if(res1){const s=scoreFor(pr,res1);badge=`<span class="mpts ${s>=3?'hit':s>=1?'par':'miss'}">${s>0?'+'+s:'0'}</span>`;}}
   else if(reveal){pick='<span style="color:var(--muted)">no pick</span>';}
   else{pick='<span style="color:var(--muted)">🔒 hidden until kickoff</span>';}
-  const right=res1?`${res1.h}–${res1.a}`:`<span class="kobadge">${fmtKOshort(f.ko)}</span>`;
+  const right=res1?`${res1.h}–${res1.a}${penStr(res1)}`:`<span class="kobadge">${fmtKOshort(f.ko)}</span>`;
   h+=`<div class="rfrow"><div class="rfteams">${f.hf} ${f.home} <small>v</small> ${f.away} ${f.af}<br><small>pick: ${pick}</small></div><div class="rfscore">${right}</div>${badge}</div>`;
  }
  h+='</div>';return h;}
@@ -410,8 +434,8 @@ function resultsView(){const r=Store.results(),p=Store.preds();const played=FIXT
  let h='<div class="pad"><div class="section-intro">How your calls are landing.</div>';
  for(const f of played){const res=r[f.n],pr=p[f.n],s=scoreFor(pr,res);
   let bd='<span class="rfbadge mpts res">no pick</span>';
-  if(pr&&pr.h!=null)bd=s===3?'<span class="rfbadge mpts hit">+3</span>':s===1?'<span class="rfbadge mpts par">+1</span>':'<span class="rfbadge mpts miss">0</span>';
-  h+=`<div class="rfrow"><div class="rfteams">${f.hf} ${f.home} <small>v</small> ${f.away} ${f.af}${pr&&pr.h!=null?`<br><small>your call ${pr.h}–${pr.a}</small>`:''}</div><div class="rfscore">${res.h}–${res.a}</div>${bd}</div>`;}
+  if(pr&&pr.h!=null)bd=`<span class="rfbadge mpts ${s>=3?'hit':s>=1?'par':'miss'}">${s>0?'+'+s:'0'}</span>`;
+  h+=`<div class="rfrow"><div class="rfteams">${f.hf} ${f.home} <small>v</small> ${f.away} ${f.af}${pr&&pr.h!=null?`<br><small>your call ${pr.h}–${pr.a}${penStr(pr)}</small>`:''}</div><div class="rfscore">${res.h}–${res.a}${penStr(res)}</div>${bd}</div>`;}
  h+='</div>';return h;}
 
 function render(){

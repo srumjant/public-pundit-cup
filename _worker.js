@@ -48,7 +48,13 @@ export default {
             const no = pr.MatchNo && pr.MatchNo.number;
             const hg = pr.HomeGoals && pr.HomeGoals.number;
             const ag = pr.AwayGoals && pr.AwayGoals.number;
-            if (no != null && hg != null && ag != null) results[no] = { h: hg, a: ag };
+            if (no != null && hg != null && ag != null) {
+              const r = { h: hg, a: ag };
+              const ph = pr.PenHome && pr.PenHome.number;
+              const pa = pr.PenAway && pr.PenAway.number;
+              if (ph != null && pa != null) { r.ph = ph; r.pa = pa; r.pw = ph > pa ? "h" : "a"; }
+              results[no] = r;
+            }
           }
           cursor = d.has_more ? d.next_cursor : null;
         } while (cursor);
