@@ -84,8 +84,9 @@ export default {
       if (path.endsWith("/api/predict") && request.method === "POST") {
         const { name, preds } = await request.json();
         if (!name || typeof name !== "string") return json({ error: "name required" }, 400);
-        const blob = JSON.stringify(preds || {}).slice(0, 1990);
-        const rich = [{ type: "text", text: { content: blob } }];
+        const incoming = (preds && typeof preds === "object") ? preds : {};
+        // Split into <2000-char rich_text chunks so long prediction sets are never truncated.
+        const chunk = (s) => { const a = []; for (let i = 0; i < s.length; i += 1900) a.push({ type: "text", text: { content: s.slice(i, i + 1900) } }); return a.length ? a : [{ type: "text", text: { content: "{}" } }]; };
 
         const q = await fetch(`${NOTION}/databases/${PLAYERS_DB}/query`, {
           method: "POST", headers: H,
@@ -94,16 +95,22 @@ export default {
         const qd = await q.json();
 
         if (qd.results && qd.results.length) {
+          // Merge onto existing so a stale or partial client can never wipe saved picks.
+          const pr = qd.results[0].properties;
+          const raw = ((pr.Predictions && pr.Predictions.rich_text) || []).map((t) => t.plain_text).join("");
+          let existing = {};
+          try { existing = raw ? JSON.parse(raw) : {}; } catch (e) { existing = {}; }
+          const merged = Object.assign({}, existing, incoming);
           await fetch(`${NOTION}/pages/${qd.results[0].id}`, {
             method: "PATCH", headers: H,
-            body: JSON.stringify({ properties: { Predictions: { rich_text: rich } } }),
+            body: JSON.stringify({ properties: { Predictions: { rich_text: chunk(JSON.stringify(merged)) } } }),
           });
         } else {
           await fetch(`${NOTION}/pages`, {
             method: "POST", headers: H,
             body: JSON.stringify({
               parent: { database_id: PLAYERS_DB },
-              properties: { Name: { title: [{ text: { content: name } }] }, Predictions: { rich_text: rich } },
+              properties: { Name: { title: [{ text: { content: name } }] }, Predictions: { rich_text: chunk(JSON.stringify(incoming)) } },
             }),
           });
         }
